@@ -1,78 +1,270 @@
-## **Product Requirements Document: Model Context Protocol (MCP) Server for Mesh Design System**
+# MeshMCP Enhancement PRD
 
-**v1.0**
+## Product Requirements Document for Prototyping Workflow Integration
 
-**July 31, 2025**
+### Overview
 
-### **1. Introduction/Purpose**
+Enhance the existing MeshMCP server to become a comprehensive prototyping assistant that not only provides component information but actively generates realistic placeholder data and React prototype code for rapid UI mockup creation.
 
-This document outlines the product requirements for a Model Context Protocol (MCP) server that will act as a bridge between AI-powered development tools, such as Cursor.ai, and the Mesh Design System. The strategic importance of this MCP server is to enhance developer productivity and ensure design consistency by enabling AI assistants to natively understand and utilize our design system. By exposing Mesh components and their documentation through a standardized protocol, we can streamline the UI development process, reduce the learning curve for new developers, and ensure that AI-generated code adheres to our established design patterns and best practices.
+### Current State
 
-### **2. Goals**
+- ✅ FastAPI-based MCP server with Docker support
+- ✅ Component discovery and detailed component information
+- ✅ Design token access
+- ✅ Intelligent caching system
+- ✅ Web scraping from Mesh Storybook
 
-- **Component Discovery:** Enable AI assistants to retrieve a list of all available components within the Mesh Design System.
-- **Detailed Component Information:** Allow AI assistants to access comprehensive details for any given component, including its properties (props), usage guidelines, and code examples.
-- **Accurate Code Generation:** Facilitate the generation of correct and context-aware code that utilizes Mesh components with their proper props and styling.
-- **Improved Developer Experience:** Provide a seamless and efficient workflow for developers using AI-powered tools to build UIs with Mesh components.
+### Enhancement Goals
 
-### **3. Key Features (MCP Tools to Expose)**
+Transform MeshMCP from a read-only component reference into an active prototyping assistant that can generate working React code and realistic data for rapid concept validation.
 
-#### **Tool 1: `listComponents`**
+---
 
-- **Description:** Provides a comprehensive list of all available UI components in the Mesh Design System (storybook).
-- **Input:** None.
-- **Output:** A JSON array of component names.
-  - _Example:_ `["Accordion", "Alert", "Autocomplete", "Button", "Card", "Checkbox", "Checkbox Group", "Copy", "Date Picker", "Date Textbox", "Divider", "Error Template", "Expander", "Expander Group", "Feature Panel", "File Upload", "Footer", "Fonts", "Form", "Form Control", "Grow Layout", "Header", "Header Footer Layout", "Heading", "Hero Panel", "Icons", "Info Box", "Link", "Loader", "Logo", "Modal", "ModeProvider", "Overlay", "Product Card", "Progress Stepper", "Radio", "Radio Button", "Radio Group", "React HTML", "Select", "Simple Table", "Skip Link", "Table", "Tabs", "Tag", "Textarea", "Textbox", "Theme", "Tooltip", "Utility Button", "Villain Panel"]`
-- **Data Source:** Web scraping the main design system site and Storybook.
+## New Features
 
-#### **Tool 2: `getComponentDetails`**
+### 1. Placeholder Data Generation
 
-- **Description:** Fetches detailed information for a specific component.
-- **Input:** `componentName` (string, e.g., "Accordion").
-- **Output:** A JSON object containing:
-  - `name` (string): The name of the component.
-  - `description` (string): A description of the component and its use.
-  - `props` (JSON object): A mapping of prop names to their type, description, and default value.
-  - `codeExamples` (array of strings or objects): Code snippets demonstrating component usage.
-  - `storybookUrl` (string): A direct link to the component's Storybook page.
-  - `designGuidance` (string): Brief notes on when and how to use the component.
-- **Data Source:** Web scraping the Storybook site for the specific component's documentation page.
+**Requirement**: Generate realistic placeholder data tailored to nib's insurance/healthcare context.
 
-#### **(Optional) Tool 3: `getDesignTokens`**
+**Implementation**:
 
-- **Description:** Provides core design tokens (e.g., colors, typography, spacing).
-- **Input:** `tokenType` (string, e.g., "colors") or none to retrieve all.
-- **Output:** A JSON object representing the design tokens.
-- **Data Source:** Web scraping from https://www.meshdesignsystem.com/design-tokens/tokens-reference
+- **Tool**: `generatePlaceholderData`
+- **Data Types**: members, policies, claims, providers
+- **Configurable**: count parameter (default: 10)
+- **Realistic**: Australian names, insurance-specific terminology, realistic dates/amounts
 
-### **4. Technical Specifications**
+**Input Schema**:
 
-- **Protocol:** Model Context Protocol (MCP). JSON over HTTP/HTTPS.
-- **Preferred Language/Framework:**
-  - **Python:** FastAPI or Flask with libraries like BeautifulSoup or Playwright for web scraping.
-  - **Node.js:** Express with libraries like Cheerio or Playwright for web scraping.
-- **Deployment:** The application should be containerized using Docker for portability and ease of deployment.
-- **Error Handling:** Implement robust error handling for scenarios such as:
-  - Component not found.
-  - Web scraping failures.
-  - Invalid input.
-- **Performance:** To optimize performance and reduce redundant scraping, a caching mechanism should be implemented for the scraped data. The cache should be refreshed periodically or on-demand to reflect updates to the design system.
-- **Security:** If the MCP server is exposed to the public internet, it should be placed behind a secure gateway or proxy. Access should be limited to authorized clients or networks.
+```json
+{
+  "dataType": "members|policies|claims|providers",
+  "count": 10
+}
+```
 
-### **5. API Endpoints (as per MCP Spec)**
+**Output**: JSON array of realistic records with appropriate fields for each data type.
 
-- **`GET /tools`:** Returns the MCP manifest, which is a list of the available tools (`listComponents`, `getComponentDetails`, `getDesignTokens`).
-- **`POST /tools/{tool_name}/invoke`:** Used to execute a specific tool. The request body will contain the necessary inputs for the tool.
+### 2. React Code Generation
 
-### **6. Success Criteria**
+**Requirement**: Generate complete, working React components using actual Mesh components.
 
-- Cursor.ai (or another MCP-compatible client) can successfully call the `listComponents` tool and display the components from the Mesh Design System.
-- Cursor.ai can retrieve accurate and complete details for any specified component using the `getComponentDetails` tool.
-- AI-assisted code generation produces valid code that correctly implements Mesh components and their props.
-- The MCP server demonstrates stability and high availability with minimal downtime.
+**Implementation**:
 
-### **7. Out of Scope**
+- **Tool**: `generatePrototypeCode`
+- **Templates**: Table with filters, forms, dashboards, generic layouts
+- **Integration**: Uses existing component details from scraper
+- **Smart**: Includes imports, state management, event handlers
 
-- **Authentication and Authorization:** The initial version will not include user-specific authentication or authorization mechanisms.
-- **Advanced Management UI:** A dedicated user interface for managing scraped data or configuring the MCP server is not in scope for v1.0.
-- **Real-time Synchronization:** The server will rely on periodic re-scraping for updates. Real-time synchronization with the design system is not a requirement for the initial release.
+**Input Schema**:
+
+```json
+{
+  "description": "table with dropdown filters",
+  "components": ["Table", "Select", "Button"],
+  "includeData": true
+}
+```
+
+**Output**: Complete React component code ready to use in prototyping workspace.
+
+### 3. Use Case Component Search
+
+**Requirement**: Intelligent component suggestions based on UI patterns and use cases.
+
+**Implementation**:
+
+- **Tool**: `searchComponentsByUseCase`
+- **Mapping**: Pre-defined use case → component mappings
+- **Smart Matching**: Keyword analysis and relevance scoring
+- **Context Aware**: Insurance/healthcare specific suggestions
+
+**Input Schema**:
+
+```json
+{
+  "useCase": "data table with filtering and sorting"
+}
+```
+
+**Output**: Ranked list of relevant components with descriptions and relevance scores.
+
+---
+
+## Technical Requirements
+
+### Data Generation Logic
+
+- **Member Data**: Realistic Australian names, email patterns, insurance statuses, join dates, premium amounts
+- **Policy Data**: Insurance-specific policy types (Hospital, Extras, Combined), categories (Basic, Bronze, Silver, Gold), realistic premiums and excesses
+- **Claims Data**: Healthcare claim types (Hospital, Dental, Optical), processing statuses, realistic amounts and dates
+- **Provider Data**: Healthcare provider types, Australian locations, contact information
+
+### Code Generation Templates
+
+- **Table Component**: Includes filtering, state management, realistic column definitions
+- **Form Component**: Input validation, controlled components, submission handling
+- **Dashboard Component**: Grid layout, summary cards, data visualization placeholders
+- **Generic Component**: Flexible template for custom requirements
+
+### Use Case Mappings
+
+Pre-define intelligent mappings for common patterns:
+
+- "table with filters" → Table, Select, Input, Button
+- "dashboard" → Card, Grid, Chart, Stats
+- "form" → Input, Select, Checkbox, Button, TextArea
+- "search interface" → Input, Button, Card, List
+- "navigation" → Menu, Breadcrumb, Tabs
+
+---
+
+## API Enhancements
+
+### New Endpoints
+
+#### 1. Generate Placeholder Data
+
+```
+POST /tools/generatePlaceholderData/invoke
+```
+
+**Purpose**: Create realistic test data for prototypes
+**Response**: JSON array of data records
+
+#### 2. Generate Prototype Code
+
+```
+POST /tools/generatePrototypeCode/invoke
+```
+
+**Purpose**: Generate complete React component code
+**Response**: Ready-to-use React component as string
+
+#### 3. Search Components by Use Case
+
+```
+POST /tools/searchComponentsByUseCase/invoke
+```
+
+**Purpose**: Find relevant components for specific UI patterns
+**Response**: Ranked list of component suggestions
+
+### Updated Tools Manifest
+
+Extend existing manifest to include new tools with proper JSON schemas for validation.
+
+---
+
+## Implementation Plan
+
+### Phase 1: Core Data Generation (Week 1)
+
+- [ ] Add placeholder data generation functions
+- [ ] Implement `generatePlaceholderData` endpoint
+- [ ] Create realistic data templates for all 4 data types
+- [ ] Add data generation tests
+
+### Phase 2: Code Generation (Week 2)
+
+- [ ] Build React code templates for common patterns
+- [ ] Implement `generatePrototypeCode` endpoint
+- [ ] Integrate with existing component scraper
+- [ ] Add code generation logic for tables, forms, dashboards
+
+### Phase 3: Smart Search (Week 3)
+
+- [ ] Create use case mapping system
+- [ ] Implement `searchComponentsByUseCase` endpoint
+- [ ] Add keyword matching and relevance scoring
+- [ ] Test with various UI patterns
+
+### Phase 4: Integration & Testing (Week 4)
+
+- [ ] Update tools manifest
+- [ ] Add comprehensive error handling
+- [ ] Update Docker configuration
+- [ ] Test with Cursor integration
+- [ ] Update documentation
+
+---
+
+## Success Metrics
+
+### Functionality Metrics
+
+- [ ] All 3 new tools working correctly
+- [ ] Generates realistic data for all 4 types
+- [ ] Produces working React code for common patterns
+- [ ] Suggests relevant components for 15+ use cases
+
+### Integration Metrics
+
+- [ ] Seamless integration with existing MCP architecture
+- [ ] Maintains current caching performance
+- [ ] Docker build/run succeeds without issues
+- [ ] Cursor can successfully call all new tools
+
+### User Experience Metrics
+
+- [ ] Generated code requires minimal manual editing
+- [ ] Placeholder data looks realistic and contextually appropriate
+- [ ] Component suggestions are relevant and helpful
+- [ ] Total time from idea to working prototype < 2 minutes
+
+---
+
+## Testing Strategy
+
+### Unit Tests
+
+- Data generation functions produce valid, realistic data
+- Code generation creates syntactically correct React
+- Use case search returns relevant components
+
+### Integration Tests
+
+- All endpoints respond correctly to valid inputs
+- Error handling works for invalid inputs
+- Caching system works with new endpoints
+
+### End-to-End Tests
+
+- Cursor can successfully call new tools
+- Generated code runs in React environment
+- Prototyping workflow functions smoothly
+
+---
+
+## Deployment
+
+### Docker Updates
+
+- No changes to existing Dockerfile/docker-compose
+- New dependencies automatically installed
+- Maintains existing port/health check configuration
+
+### Configuration
+
+- Add environment variables for data generation settings
+- Maintain existing cache configuration
+- Keep current logging and error handling
+
+### Rollback Plan
+
+- New endpoints are additive, won't break existing functionality
+- Can disable new tools via feature flags if needed
+- Existing tools remain unchanged
+
+---
+
+## Success Definition
+
+The enhanced MeshMCP should enable this workflow:
+
+1. User describes UI concept to Cursor
+2. Cursor queries MCP for relevant components
+3. Cursor generates placeholder data via MCP
+4. Cursor creates React prototype code via MCP
+5. User sees working prototype in < 2 minutes
+
+**Key Success Indicator**: Complete "sketch to working prototype" workflow without manual component lookup or data creation.
