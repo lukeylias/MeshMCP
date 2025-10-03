@@ -4,7 +4,7 @@ MCP Server for Mesh Design System
 Provides AI assistants access to Mesh components and design tokens
 """
 
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
 from typing import Dict, List, Any
 import logging
 import json

@@ -15,6 +15,9 @@ A stdio-based Model Context Protocol (MCP) server that provides Claude Code (VS 
 ## Quick Start
 
 ### 1. Install Dependencies
+
+**⚠️ Dependencies Fixed!** See [INSTALL.md](INSTALL.md) for detailed installation instructions.
+
 ```bash
 pip install -r requirements.txt
 playwright install chromium
