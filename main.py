@@ -4,307 +4,140 @@ MCP Server for Mesh Design System
 Provides AI assistants access to Mesh components and design tokens
 """
 
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel
-from typing import Dict, List, Any, Optional
+from mcp.server.fastmcp import FastMCP
+from typing import Dict, List, Any
 import logging
-import asyncio
-from datetime import datetime, timedelta
+import json
 
 from scrapers.mesh_scraper import MeshScraper
 from cache.cache_manager import CacheManager
 from generators.data_generator import DataGenerator
-from models.mcp_models import (
-    MCPManifest, MCPTool, MCPInvokeRequest, MCPInvokeResponse,
-    PlaceholderDataRequest, ComponentSearchRequest, PrototypeCodeRequest
-)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize FastAPI app
-app = FastAPI(
-    title="Mesh Design System MCP Server",
-    description="Model Context Protocol server for AI assistant integration with Mesh Design System",
-    version="1.0.0"
-)
-
-# Add CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
-    allow_credentials=True,
-    allow_methods=["*"],  
-    allow_headers=["*"],
-)
+# Initialize FastMCP server
+mcp = FastMCP("Mesh Design System")
 
 # Initialize services
 mesh_scraper = MeshScraper()
 cache_manager = CacheManager()
 data_generator = DataGenerator()
 
-# MCP Tools Definition
-MCP_TOOLS = [
-    MCPTool(
-        name="listComponents",
-        description="Provides a comprehensive list of all available UI components in the Mesh Design System",
-        inputSchema={
-            "type": "object",
-            "properties": {},
-            "required": []
-        }
-    ),
-    MCPTool(
-        name="getComponentDetails", 
-        description="Fetches detailed information for a specific component",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "componentName": {
-                    "type": "string",
-                    "description": "Name of the component to get details for"
-                }
-            },
-            "required": ["componentName"]
-        }
-    ),
-    MCPTool(
-        name="getDesignTokens",
-        description="Provides core design tokens (colors, typography, spacing)",
-        inputSchema={
-            "type": "object", 
-            "properties": {
-                "tokenType": {
-                    "type": "string",
-                    "description": "Type of tokens to retrieve (optional)",
-                    "enum": ["colors", "typography", "spacing", "all"]
-                }
-            },
-            "required": []
-        }
-    ),
-    MCPTool(
-        name="generatePlaceholderData",
-        description="Generate realistic placeholder data for insurance/healthcare prototyping",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "dataType": {
-                    "type": "string",
-                    "description": "Type of data to generate",
-                    "enum": ["members", "policies", "claims", "providers"]
-                },
-                "count": {
-                    "type": "integer",
-                    "description": "Number of records to generate",
-                    "default": 10,
-                    "minimum": 1,
-                    "maximum": 100
-                }
-            },
-            "required": ["dataType"]
-        }
-    ),
-    MCPTool(
-        name="searchComponentsByUseCase",
-        description="Find relevant Mesh components for specific UI patterns and use cases",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "useCase": {
-                    "type": "string",
-                    "description": "Description of the UI pattern or use case"
-                }
-            },
-            "required": ["useCase"]
-        }
-    ),
-    MCPTool(
-        name="generatePrototypeCode",
-        description="Generate complete React component code using Mesh components",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "description": {
-                    "type": "string",
-                    "description": "Description of the component to generate"
-                },
-                "components": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "description": "Specific Mesh components to include"
-                },
-                "includeData": {
-                    "type": "boolean",
-                    "description": "Whether to include placeholder data",
-                    "default": True
-                }
-            },
-            "required": ["description"]
-        }
-    )
-]
-
-@app.get("/")
-async def root():
-    """Health check endpoint"""
-    return {"message": "Mesh Design System MCP Server", "status": "running", "version": "1.0.0"}
-
-@app.get("/tools")
-async def get_tools() -> MCPManifest:
-    """Returns the MCP manifest with available tools"""
-    logger.info("Returning MCP tools manifest")
-    return MCPManifest(tools=MCP_TOOLS)
-
-@app.post("/tools/{tool_name}/invoke")
-async def invoke_tool(tool_name: str, request: MCPInvokeRequest) -> MCPInvokeResponse:
-    """Execute a specific MCP tool"""
-    logger.info(f"Invoking tool: {tool_name} with args: {request.arguments}")
-    
-    try:
-        if tool_name == "listComponents":
-            result = await handle_list_components()
-        elif tool_name == "getComponentDetails":
-            component_name = request.arguments.get("componentName")
-            if not component_name:
-                raise HTTPException(status_code=400, detail="componentName is required")
-            result = await handle_get_component_details(component_name)
-        elif tool_name == "getDesignTokens":
-            token_type = request.arguments.get("tokenType", "all")
-            result = await handle_get_design_tokens(token_type)
-        elif tool_name == "generatePlaceholderData":
-            data_type = request.arguments.get("dataType")
-            count = request.arguments.get("count", 10)
-            if not data_type:
-                raise HTTPException(status_code=400, detail="dataType is required")
-            result = await handle_generate_placeholder_data(data_type, count)
-        elif tool_name == "searchComponentsByUseCase":
-            use_case = request.arguments.get("useCase")
-            if not use_case:
-                raise HTTPException(status_code=400, detail="useCase is required")
-            result = await handle_search_components_by_use_case(use_case)
-        elif tool_name == "generatePrototypeCode":
-            description = request.arguments.get("description")
-            components = request.arguments.get("components", [])
-            include_data = request.arguments.get("includeData", True)
-            if not description:
-                raise HTTPException(status_code=400, detail="description is required")
-            result = await handle_generate_prototype_code(description, components, include_data)
-        else:
-            raise HTTPException(status_code=404, detail=f"Tool {tool_name} not found")
-            
-        return MCPInvokeResponse(content=[{"type": "text", "text": str(result)}])
-        
-    except Exception as e:
-        logger.error(f"Error invoking tool {tool_name}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Tool execution failed: {str(e)}")
-
-async def handle_list_components() -> List[str]:
-    """Handle listComponents tool execution"""
+# Tool 1: List Components
+@mcp.tool()
+async def list_components() -> str:
+    """Provides a comprehensive list of all available UI components in the Mesh Design System"""
     cache_key = "mesh_components_list"
-    
+
     # Check cache first
     cached_result = await cache_manager.get(cache_key)
     if cached_result:
         logger.info("Returning cached components list")
-        return cached_result
-    
+        return json.dumps(cached_result, indent=2)
+
     # Scrape components if not cached
     logger.info("Scraping components list from Mesh Design System")
     components = await mesh_scraper.scrape_components_list()
-    
+
     # Cache the result
     await cache_manager.set(cache_key, components, ttl=3600)  # 1 hour TTL
-    
-    return components
 
-async def handle_get_component_details(component_name: str) -> Dict[str, Any]:
-    """Handle getComponentDetails tool execution"""
+    return json.dumps(components, indent=2)
+
+# Tool 2: Get Component Details
+@mcp.tool()
+async def get_component_details(component_name: str) -> str:
+    """Fetches detailed information for a specific component including props, examples, and design guidance"""
     cache_key = f"mesh_component_{component_name.lower()}"
-    
+
     # Check cache first
     cached_result = await cache_manager.get(cache_key)
     if cached_result:
         logger.info(f"Returning cached details for component: {component_name}")
-        return cached_result
-    
+        return json.dumps(cached_result, indent=2)
+
     # Scrape component details if not cached
     logger.info(f"Scraping details for component: {component_name}")
     details = await mesh_scraper.scrape_component_details(component_name)
-    
+
     if not details:
-        raise HTTPException(status_code=404, detail=f"Component '{component_name}' not found")
-    
+        return json.dumps({"error": f"Component '{component_name}' not found"}, indent=2)
+
     # Cache the result
     await cache_manager.set(cache_key, details, ttl=7200)  # 2 hours TTL
-    
-    return details
 
-async def handle_get_design_tokens(token_type: str = "all") -> Dict[str, Any]:
-    """Handle getDesignTokens tool execution"""
+    return json.dumps(details, indent=2)
+
+# Tool 3: Get Design Tokens
+@mcp.tool()
+async def get_design_tokens(token_type: str = "all") -> str:
+    """Provides core design tokens (colors, typography, spacing) from the Mesh Design System"""
     cache_key = f"mesh_design_tokens_{token_type}"
-    
+
     # Check cache first
     cached_result = await cache_manager.get(cache_key)
     if cached_result:
         logger.info(f"Returning cached design tokens for type: {token_type}")
-        return cached_result
-    
+        return json.dumps(cached_result, indent=2)
+
     # Scrape design tokens if not cached
     logger.info(f"Scraping design tokens for type: {token_type}")
     tokens = await mesh_scraper.scrape_design_tokens(token_type)
-    
+
     # Cache the result
     await cache_manager.set(cache_key, tokens, ttl=7200)  # 2 hours TTL
-    
-    return tokens
 
-async def handle_generate_placeholder_data(data_type: str, count: int = 10) -> List[Dict[str, Any]]:
-    """Handle generatePlaceholderData tool execution"""
+    return json.dumps(tokens, indent=2)
+
+# Tool 4: Generate Placeholder Data
+@mcp.tool()
+async def generate_placeholder_data(data_type: str, count: int = 10) -> str:
+    """Generate realistic placeholder data for insurance/healthcare prototyping (members, policies, claims, providers)"""
     cache_key = f"placeholder_data_{data_type}_{count}"
-    
+
     # Check cache first (shorter TTL for placeholder data)
     cached_result = await cache_manager.get(cache_key)
     if cached_result:
         logger.info(f"Returning cached placeholder data for type: {data_type}, count: {count}")
-        return cached_result
-    
+        return json.dumps(cached_result, indent=2)
+
     # Generate new data
     logger.info(f"Generating placeholder data for type: {data_type}, count: {count}")
     try:
         data = data_generator.generate_data(data_type, count)
-        
+
         # Cache the result with shorter TTL (30 minutes)
         await cache_manager.set(cache_key, data, ttl=1800)
-        
-        return data
+
+        return json.dumps(data, indent=2)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        return json.dumps({"error": str(e)}, indent=2)
     except Exception as e:
         logger.error(f"Error generating placeholder data: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Data generation failed: {str(e)}")
+        return json.dumps({"error": f"Data generation failed: {str(e)}"}, indent=2)
 
-async def handle_search_components_by_use_case(use_case: str) -> List[Dict[str, Any]]:
-    """Handle searchComponentsByUseCase tool execution"""
+# Tool 5: Search Components By Use Case
+@mcp.tool()
+async def search_components_by_use_case(use_case: str) -> str:
+    """Find relevant Mesh components for specific UI patterns and use cases (e.g., tables, forms, dashboards)"""
     cache_key = f"use_case_search_{use_case.lower().replace(' ', '_')}"
-    
+
     # Check cache first
     cached_result = await cache_manager.get(cache_key)
     if cached_result:
         logger.info(f"Returning cached component suggestions for use case: {use_case}")
-        return cached_result
-    
+        return json.dumps(cached_result, indent=2)
+
     # Generate component suggestions
     logger.info(f"Searching components for use case: {use_case}")
     suggestions = await _search_components_by_use_case(use_case)
-    
+
     # Cache the result
     await cache_manager.set(cache_key, suggestions, ttl=3600)
-    
-    return suggestions
+
+    return json.dumps(suggestions, indent=2)
 
 async def _search_components_by_use_case(use_case: str) -> List[Dict[str, Any]]:
     """Internal logic for component search by use case"""
@@ -414,23 +247,25 @@ async def _search_components_by_use_case(use_case: str) -> List[Dict[str, Any]]:
     
     return sorted(unique_suggestions.values(), key=lambda x: x["relevanceScore"], reverse=True)
 
-async def handle_generate_prototype_code(description: str, components: List[str], include_data: bool = True) -> str:
-    """Handle generatePrototypeCode tool execution"""
+# Tool 6: Generate Prototype Code
+@mcp.tool()
+async def generate_prototype_code(description: str, components: List[str] = [], include_data: bool = True) -> str:
+    """Generate complete React component code using Mesh components based on a description"""
     cache_key = f"prototype_code_{description.lower().replace(' ', '_')}_{len(components)}_{include_data}"
-    
+
     # Check cache first
     cached_result = await cache_manager.get(cache_key)
     if cached_result:
         logger.info(f"Returning cached prototype code for: {description}")
         return cached_result
-    
+
     # Generate new code
     logger.info(f"Generating prototype code for: {description}")
     code = await _generate_prototype_code(description, components, include_data)
-    
+
     # Cache the result
     await cache_manager.set(cache_key, code, ttl=3600)
-    
+
     return code
 
 async def _generate_prototype_code(description: str, components: List[str], include_data: bool = True) -> str:
@@ -685,6 +520,6 @@ const CustomComponent = () => {{
 
 export default CustomComponent;"""
 
+# Entry point for stdio-based MCP server
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    mcp.run()

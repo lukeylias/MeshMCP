@@ -1,32 +1,11 @@
 """
-Pydantic models for Model Context Protocol (MCP) data structures
+Pydantic models for data structures
+Note: MCP protocol models are now handled by the FastMCP library
+These models are kept for internal data validation
 """
 
 from pydantic import BaseModel
 from typing import Dict, List, Any, Optional
-
-class MCPTool(BaseModel):
-    """Represents an MCP tool definition"""
-    name: str
-    description: str
-    inputSchema: Dict[str, Any]
-
-class MCPManifest(BaseModel):
-    """MCP manifest containing available tools"""
-    tools: List[MCPTool]
-
-class MCPInvokeRequest(BaseModel):
-    """Request structure for tool invocation"""
-    arguments: Dict[str, Any] = {}
-
-class MCPInvokeContent(BaseModel):
-    """Content structure for MCP responses"""
-    type: str
-    text: str
-
-class MCPInvokeResponse(BaseModel):
-    """Response structure for tool invocation"""
-    content: List[MCPInvokeContent]
 
 class ComponentDetails(BaseModel):
     """Detailed information about a Mesh component"""
